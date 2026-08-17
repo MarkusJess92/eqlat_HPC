@@ -41,11 +41,14 @@
 #      sbatch submit_download_ozonesonde_eqlat.sh
 #      sbatch submit_download_ozonesonde_eqlat.sh 2005 2025
 #      sbatch submit_download_ozonesonde_eqlat.sh 2005 2025 "https://gml.noaa.gov/aftp/data/ozwv/Ozonesonde/Boulder,%20Colorado/Native%20Resolution%20(60s,%207s,%201s)/"
+#      sbatch submit_download_ozonesonde_eqlat.sh 2005 2025 "" 2020 2025   # ERA5/MERRA-2 nur 2020-2025
 #
 #  Arguments:
-#      $1  Start year  (optional, default: 2005)
-#      $2  End year    (optional, default: 2025)
-#      $3  Ozonesonde base URL (optional, default: NOAA GML Boulder, CO)
+#      $1  Start year              (optional, default: 2005)
+#      $2  End year                (optional, default: 2025)
+#      $3  Ozonesonde base URL     (optional, default: NOAA GML Boulder, CO)
+#      $4  ERA5/MERRA-2 start year (optional, default: same as $1)
+#      $5  ERA5/MERRA-2 end year   (optional, default: same as $2)
 #
 #  NOTE ON PARTITION: this job uses --partition=service (not orion).
 #  Regular `orion` compute nodes have no outbound internet access — only
@@ -61,10 +64,13 @@ set -eo pipefail
 YEAR_START=${1:-2005}
 YEAR_END=${2:-2025}
 O3_URL=${3:-"https://gml.noaa.gov/aftp/data/ozwv/Ozonesonde/Boulder,%20Colorado/Native%20Resolution%20(60s,%207s,%201s)/"}
+ERA5_MERRA2_START=${4:-$YEAR_START}
+ERA5_MERRA2_END=${5:-$YEAR_END}
 
 DATA_ROOT=${DATA:-/work2/noaa/co2/jesswein/data}
 O3_OUTDIR="${DATA_ROOT}/ozonesonde"
 DATES_FILE="${O3_OUTDIR}/o3sonde_dates.txt"
+DATES_FILE_FILTERED="${O3_OUTDIR}/o3sonde_dates_era5_merra2.txt"
 ERA5_OUTDIR="${DATA_ROOT}/ERA5_ozonesonde"
 MERRA2_OUTDIR="${DATA_ROOT}/MERRA2_ozonesonde"
 
@@ -74,6 +80,7 @@ echo "  Years        : $YEAR_START - $YEAR_END"
 echo "  Sonde URL    : $O3_URL"
 echo "  Sonde outdir : $O3_OUTDIR"
 echo "  Dates file   : $DATES_FILE"
+echo "  ERA5/MERRA-2 : $ERA5_MERRA2_START - $ERA5_MERRA2_END"
 echo "  ERA5 outdir  : $ERA5_OUTDIR"
 echo "  MERRA2 outdir: $MERRA2_OUTDIR"
 echo "  Job ID       : $SLURM_JOB_ID"
@@ -115,13 +122,26 @@ source /work2/noaa/co2/miniconda3/etc/profile.d/conda.sh
 #    exit 0
 #fi
 
+# ---------- Step 3 pre: Filter dates to ERA5/MERRA-2 time range ----------
+echo ""
+echo "### Filtering dates to ${ERA5_MERRA2_START}-${ERA5_MERRA2_END} ###"
+awk -F'-' '$1 >= '"$ERA5_MERRA2_START"' && $1 <= '"$ERA5_MERRA2_END"'' "$DATES_FILE" \
+    > "$DATES_FILE_FILTERED"
+N_FILTERED=$(wc -l < "$DATES_FILE_FILTERED")
+echo "Dates in range: $N_FILTERED"
+
+if [ "$N_FILTERED" -le 0 ]; then
+    echo "Keine Daten im gewählten Zeitraum — ERA5/MERRA-2 Download wird übersprungen."
+    exit 0
+fi
+
 # ---------- Step 3: ERA5 for those dates ----------
 conda activate e5
 
 echo ""
 echo "### Step 3: ERA5 download for ozonesonde dates ###"
 python "${HOME}/eqlat_HPC/src/download/download_ERA_5.py" \
-    --dates-file "$DATES_FILE" \
+    --dates-file "$DATES_FILE_FILTERED" \
     --outdir     "$ERA5_OUTDIR"
 
 conda deactivate
@@ -132,7 +152,7 @@ conda activate ccgg
 echo ""
 echo "### Step 4: MERRA-2 download for ozonesonde dates ###"
 python "${HOME}/eqlat_HPC/src/download/download_MERRA_2_new.py" \
-    --dates-file "$DATES_FILE" \
+    --dates-file "$DATES_FILE_FILTERED" \
     --outdir     "$MERRA2_OUTDIR"
 
 conda deactivate

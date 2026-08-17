@@ -113,9 +113,10 @@ eqlat, o3_ref = equivalent_latitude_swoosh_new(
 | `src/download/download_ERA_5.py` | Download ERA5 PV + temperature from CDS |
 | `src/download/download_MERRA_2_new.py` | Download MERRA-2 EPV + temperature via earthaccess |
 | `src/download/download_mls.py` | Download MLS (Microwave Limb Sounder) ozone profiles |
-| `src/download/download_ozonesondes.py` | Download ozonesonde data; `download_ozonesondes_gps_range()` filters to profiles with per-scan GPS lat/lon and writes a flight-date manifest |
+| `src/download/download_ozonesondes.py` | Download ozonesonde data (one call per year, all profiles) |
 | `src/calc/merge_reanalysis.py` | Merge reanalysis files |
 | `src/calc/process_fields.py` | Batch compute equivalent latitude fields |
+| `src/calc/match_ozonesonde_eqlat.py` | Interpolate ERA5/MERRA-2 equivalent-latitude fields onto ozonesonde profiles (per-scan, using the sonde's own pressure/temperature/position/time) |
 | `src/analysis/reanalysis_stats.py` | Seasonal bias & RMSD between ERA5 and MERRA-2 eqlat |
 
 ### Batch processing from the command line
@@ -136,8 +137,9 @@ Submit scripts in `jobs/` are configured for the `co2` account on the `orion` pa
 |---|---|
 | `jobs/submit_download_ERA5.sh` | Download ERA5 for a given year: `sbatch submit_download_ERA5.sh 2023` |
 | `jobs/submit_download_MERRA2.sh` | Download MERRA-2 for a given year: `sbatch submit_download_MERRA2.sh 2023` |
-| `jobs/submit_download_ozonesonde_eqlat.sh` | Download Boulder ozonesondes with GPS lat/lon, then ERA5 + MERRA-2 for exactly those flight dates: `sbatch submit_download_ozonesonde_eqlat.sh 2005 2025` |
+| `jobs/submit_download_ozonesonde_eqlat.sh` | Download Boulder ozonesondes, then ERA5 + MERRA-2 for exactly those flight dates: `sbatch submit_download_ozonesonde_eqlat.sh 2005 2025` |
 | `jobs/submit_process_eqlat.sh` | Compute eqlat fields (both piecewise + ROI, skips existing files) |
+| `jobs/submit_ozonesonde_eqlat_profile.sh` | Compute ERA5/MERRA-2 eqlat fields for the ozonesonde days, then interpolate onto each profile: `sbatch submit_ozonesonde_eqlat_profile.sh` |
 | `jobs/submit_reanalysis_stats.sh` | Compute seasonal bias & RMSD between ERA5 and MERRA-2 |
 
 ## Notebooks
@@ -170,12 +172,14 @@ eqlat_HPC/
 │   │   └── reanalysis_stats.py
 │   └── calc/
 │       ├── merge_reanalysis.py
-│       └── process_fields.py
+│       ├── process_fields.py
+│       └── match_ozonesonde_eqlat.py
 ├── jobs/
 │   ├── submit_download_ERA5.sh
 │   ├── submit_download_MERRA2.sh
 │   ├── submit_download_ozonesonde_eqlat.sh
 │   ├── submit_process_eqlat.sh
+│   ├── submit_ozonesonde_eqlat_profile.sh
 │   └── submit_reanalysis_stats.sh
 ├── notebooks/
 │   ├── 00_anel_figures.ipynb
